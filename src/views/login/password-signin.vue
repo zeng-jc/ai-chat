@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref, watch } from 'vue'
+import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Message } from '@arco-design/web-vue'
 import { usernameRule, passwordRule } from './formRules'
@@ -60,7 +60,12 @@ const toSignup = () => {
       </a-form-item>
       <!-- 密码输入框 -->
       <a-form-item field="password" label="密码" :rules="passwordRule">
-        <a-input-password v-model="loginForm.password" placeholder="请输入密码" allow-clear autocomplete>
+        <a-input-password
+          v-model="loginForm.password"
+          placeholder="请输入密码"
+          allow-clear
+          autocomplete
+        >
           <template #prefix>
             <icon-lock />
           </template>

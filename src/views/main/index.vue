@@ -8,6 +8,8 @@ const router = useRouter()
 const aTextareaRef = ref()
 const textareaValue = ref<string>('')
 const questions = reactive<string[]>([])
+const dialogueRecord = reactive<{ [prop: string]: any }[]>([])
+const curDialogKey = ref<number>(null)
 
 // 退出登录
 const logout = () => {
@@ -20,12 +22,37 @@ const logout = () => {
   Message.success('退出登录成功！')
 }
 
+// 新建对话
+const createDialog = () => {
+  const dialogueInfo = {
+    key: Date.now(),
+    name: '1'
+  }
+  dialogueRecord.push(dialogueInfo)
+}
+
+// 对话框点击处理
+const dialogClickHandle = (key: number) => {
+  curDialogKey.value = key
+}
+
+const sendHandle = () => {
+  if (dialogueRecord.length <= 0) {
+    const dialogueInfo = {
+      key: Date.now(),
+      name: '1'
+    }
+    dialogueRecord.push(dialogueInfo)
+  }
+  questions.push(textareaValue.value)
+  textareaValue.value = ''
+  event.preventDefault()
+}
+
 onMounted(() => {
   aTextareaRef.value.textareaRef.addEventListener('keydown', (event: KeyboardEvent) => {
     if (event.key === 'Enter' && !event.shiftKey) {
-      questions.push(textareaValue.value.replaceAll('\n', '<br>'))
-      textareaValue.value = ''
-      event.preventDefault()
+      sendHandle()
     }
   })
 })
@@ -33,22 +60,57 @@ onMounted(() => {
 
 <template>
   <div class="main">
-    <a-layout style="height: 99vh; width: 99vw; margin: auto">
-      <a-layout-sider>Sider</a-layout-sider>
+    <a-layout class="layout-container">
+      <a-layout-sider width="332px" style="padding: 10px">
+        <div style="display: flex">
+          <a-input-search :style="{ width: '320px' }" placeholder="搜索对话记录" />
+          <a-button type="primary" style="margin-left: 8px" @click="createDialog">
+            <template #icon>
+              <icon-plus-circle />
+            </template>
+            <template #default> 新建对话 </template>
+          </a-button>
+        </div>
+        <ul class="dialog-container">
+          <li
+            :class="{ 'dialog-item': true, 'active-dialog': curDialogKey === item.key }"
+            @click="dialogClickHandle(item.key as number)"
+            v-for="item in dialogueRecord"
+            :key="item.key"
+          >
+            {{ item.name }}
+          </li>
+        </ul>
+      </a-layout-sider>
       <a-layout>
         <a-layout-header class="layout-header">
           <a-popconfirm content="你确定要退出登录吗?" type="warning" @ok="logout" position="left">
             <a-button type="outline">退出登录</a-button>
           </a-popconfirm>
         </a-layout-header>
-        <a-layout-content>
+        <a-layout-content class="layout-content">
           <ul>
-            <li v-for="(item, index) in questions" :key="index">
-              <div v-html="item"></div>
+            <li class="content-item" v-for="(item, index) in questions" :key="index">
+              <div class="user-content">
+                <a-avatar :style="{ backgroundColor: '#14a9f8' }">user</a-avatar>
+                <p class="user-text">{{ item }}</p>
+              </div>
+              <div class="ai-content">
+                <a-avatar :style="{ backgroundColor: '#14a9f8' }">AI</a-avatar>
+                <p class="ai-text">{{ item }}</p>
+              </div>
             </li>
           </ul>
         </a-layout-content>
-        <a-layout-footer>
+        <a-layout-footer class="layout-footer">
+          <div class="send-container">
+            <a-button type="primary" @click="sendHandle">
+              <template #icon>
+                <icon-send />
+              </template>
+              <template #default> 发送 </template>
+            </a-button>
+          </div>
           <a-textarea
             v-model:model-value="textareaValue"
             ref="aTextareaRef"
@@ -68,8 +130,66 @@ onMounted(() => {
 </template>
 
 <style lang="less" scoped>
+.layout-container {
+  height: 99vh;
+  width: 99vw;
+  margin: auto;
+}
 .layout-header {
   display: flex;
   flex-direction: row-reverse;
+}
+.layout-header,
+.layout-content,
+.layout-footer {
+  padding: 0 25px;
+}
+.send-container {
+  text-align: right;
+}
+.dialog-container {
+  .dialog-item {
+    border-radius: 8px;
+    background-color: var(--color-fill-1);
+    margin-top: 10px;
+    border: 1px solid var(--color-border-1);
+    font-size: 14px;
+    padding: 12px;
+  }
+  .active-dialog {
+    color: rgb(var(--arcoblue-6));
+    border-color: rgb(var(--arcoblue-6));
+    background-color: rgb(var(--arcoblue-1));
+  }
+}
+.content-item {
+  padding: 7px;
+  .user-content,
+  .ai-content {
+    display: flex;
+    padding: 5px 0;
+  }
+  .user-text {
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    padding: 10px;
+    border-radius: 2px;
+    margin-left: 7px;
+    line-height: 25px;
+    width: fit-content;
+    max-width: 100%;
+  }
+  .ai-text {
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    padding: 10px;
+    border-radius: 2px;
+    margin-left: 7px;
+    line-height: 25px;
+    width: 100%;
+    background-color: var(--color-neutral-2);
+  }
 }
 </style>
