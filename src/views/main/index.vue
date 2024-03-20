@@ -1,15 +1,19 @@
 <script setup lang="ts">
 import { Message } from '@arco-design/web-vue'
 import useUserStore from '@/stores/modules/user'
+import useChatStore from '@/stores/modules/chat'
 import { useRouter } from 'vue-router'
 import { ref, onMounted, reactive } from 'vue'
-const userStore = useUserStore()
+
 const router = useRouter()
+const userStore = useUserStore()
+const chatStore = useChatStore()
 const aTextareaRef = ref()
 const textareaValue = ref<string>('')
 const questions = reactive<string[]>([])
-const dialogueRecord = reactive<{ [prop: string]: any }[]>([])
-const curDialogKey = ref<number>(null)
+const conversationRecord = reactive<{ [prop: string]: any }[]>([])
+const curChatKey = ref<number>(null)
+chatStore.getChatList()
 
 // 退出登录
 const logout = () => {
@@ -22,28 +26,32 @@ const logout = () => {
   Message.success('退出登录成功！')
 }
 
-// 新建对话
-const createDialog = () => {
-  const dialogueInfo = {
+// 新建聊天
+const createChat = () => {
+  const conversationInfo = {
     key: Date.now(),
     name: '1'
   }
-  dialogueRecord.push(dialogueInfo)
+  conversationRecord.push(conversationInfo)
 }
 
 // 对话框点击处理
 const dialogClickHandle = (key: number) => {
-  curDialogKey.value = key
+  curChatKey.value = key
 }
 
-const sendHandle = () => {
-  if (dialogueRecord.length <= 0) {
-    const dialogueInfo = {
+const sendHandle = (event: KeyboardEvent) => {
+  if (conversationRecord.length <= 0) {
+    const conversationInfo = {
       key: Date.now(),
       name: '1'
     }
-    dialogueRecord.push(dialogueInfo)
+    conversationRecord.push(conversationInfo)
   }
+  // const eventSource = EventSource('/conversation/send')
+  // eventSource.onmessage = function (event) {
+  //   console.log('message', event.data)
+  // }
   questions.push(textareaValue.value)
   textareaValue.value = ''
   event.preventDefault()
@@ -52,7 +60,7 @@ const sendHandle = () => {
 onMounted(() => {
   aTextareaRef.value.textareaRef.addEventListener('keydown', (event: KeyboardEvent) => {
     if (event.key === 'Enter' && !event.shiftKey) {
-      sendHandle()
+      sendHandle(event)
     }
   })
 })
@@ -61,21 +69,24 @@ onMounted(() => {
 <template>
   <div class="main">
     <a-layout class="layout-container">
-      <a-layout-sider width="332px" style="padding: 10px">
+      <a-layout-sider style="padding: 10px; width: 332px">
         <div style="display: flex">
           <a-input-search :style="{ width: '320px' }" placeholder="搜索对话记录" />
-          <a-button type="primary" style="margin-left: 8px" @click="createDialog">
+          <a-button type="primary" style="margin-left: 8px" @click="createChat">
             <template #icon>
               <icon-plus-circle />
             </template>
-            <template #default> 新建对话 </template>
+            <template #default> 新建聊天 </template>
           </a-button>
         </div>
         <ul class="dialog-container">
           <li
-            :class="{ 'dialog-item': true, 'active-dialog': curDialogKey === item.key }"
+            :class="{
+              'dialog-item': true,
+              'active-dialog': curChatKey === item.key
+            }"
             @click="dialogClickHandle(item.key as number)"
-            v-for="item in dialogueRecord"
+            v-for="item in conversationRecord"
             :key="item.key"
           >
             {{ item.name }}
@@ -193,3 +204,4 @@ onMounted(() => {
   }
 }
 </style>
+import type { useChatStore } from '@/stores/modules/chat'

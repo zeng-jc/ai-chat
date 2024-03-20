@@ -39,6 +39,7 @@ const toSignup = () => {
 //   console.log(newVal)
 //   localStorage.setItem('keepPwd', newVal)
 // })
+// v-model="keepPwd"
 </script>
 
 <template>
@@ -75,7 +76,7 @@ const toSignup = () => {
         <a-button type="primary" long html-type="submit" :loading="signinLoading">登录</a-button>
       </a-form-item>
       <a-form-item field="isRemember" class="handler">
-        <a-checkbox v-model="keepPwd"> 记住密码 </a-checkbox>
+        <a-checkbox> 记住密码 </a-checkbox>
         <div class="forgetPassword">忘记密码</div>
       </a-form-item>
     </a-form>

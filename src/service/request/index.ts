@@ -25,6 +25,10 @@ class Service {
     // 每个实例都添加拦截器
     this.instance.interceptors.request.use(
       (config) => {
+        const userStore = useUserStore()
+        if (config.headers && typeof config.headers.set === 'function') {
+          config.headers.set('authorization', 'Bearer ' + userStore.token)
+        }
         console.log('全局请求成功的拦截')
         return config
       },
