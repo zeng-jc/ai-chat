@@ -7,7 +7,6 @@ export const service = new Service({
   // 属于这个实例的拦截器
   interceptors: {
     requestOnFulfilled(config) {
-      config.headers.Authorization = localStorage.getItem('token')
       return config
     },
     requestOnRejected(err) {

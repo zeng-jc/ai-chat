@@ -1,19 +1,31 @@
 <script setup lang="ts">
-import { Message } from '@arco-design/web-vue'
+import { saveConversationFetch, conversationListFetch } from '@/service/modules/conversation'
+import { Message, Modal } from '@arco-design/web-vue'
 import useUserStore from '@/stores/modules/user'
 import useChatStore from '@/stores/modules/chat'
 import { useRouter } from 'vue-router'
-import { ref, onMounted, reactive } from 'vue'
-
-const router = useRouter()
+import { ref, onMounted, reactive, watch } from 'vue'
+import { storeToRefs } from 'pinia'
+import { h } from 'vue'
 const userStore = useUserStore()
 const chatStore = useChatStore()
-const aTextareaRef = ref()
-const textareaValue = ref<string>('')
-const questions = reactive<string[]>([])
-const conversationRecord = reactive<{ [prop: string]: any }[]>([])
-const curChatKey = ref<number>(null)
 chatStore.getChatList()
+
+let curEditChatId = null
+let xhr = null
+const router = useRouter()
+const aTextareaRef = ref()
+const userMessageInputVal = ref<string>('')
+const conversationList = ref<any[]>([])
+const visible = ref<boolean>(null)
+const curActiveChat = ref(0) //当前选中的聊天
+const form = reactive({
+  name: ''
+})
+const scrollbarRef = ref('')
+// 发送状态（true可发送）
+const sendStatus = ref<boolean>(true)
+const { chatList } = storeToRefs<{ [prop: string]: any }[]>(chatStore)
 
 // 退出登录
 const logout = () => {
@@ -27,42 +39,109 @@ const logout = () => {
 }
 
 // 新建聊天
-const createChat = () => {
-  const conversationInfo = {
-    key: Date.now(),
-    name: '1'
-  }
-  conversationRecord.push(conversationInfo)
+const createChatHandle = async () => {
+  await chatStore.createChat()
 }
 
-// 对话框点击处理
-const dialogClickHandle = (key: number) => {
-  curChatKey.value = key
-}
-
-const sendHandle = (event: KeyboardEvent) => {
-  if (conversationRecord.length <= 0) {
-    const conversationInfo = {
-      key: Date.now(),
-      name: '1'
+// 删除聊天
+const deleteChatHandle = ({ id, name }) => {
+  Modal.warning({
+    title: () => h('span', { style: 'font-weight: 600;' }, '提示'),
+    content: () => h('span', { style: 'font-weight: 600;' }, `确定要永久删除 "${name}" 吗？`),
+    hideCancel: false,
+    cancelButtonProps: { size: 'small' },
+    okButtonProps: { size: 'small' },
+    onCancel: () => {},
+    onOk: async () => {
+      await chatStore.deleteChat(id)
+      Message.success('删除成功')
     }
-    conversationRecord.push(conversationInfo)
+  })
+}
+
+// 编辑聊天
+const editChatHandle = ({ id, name }) => {
+  visible.value = true
+  curEditChatId = id
+  form.name = name
+}
+// 编辑确认
+const handleBeforeOk = async () => {
+  await chatStore.editChat(curEditChatId, form)
+  visible.value = false
+  Message.success('编辑成功')
+}
+const scrollToHandle = (options, y) => {
+  console.log('options, y', options, y)
+}
+// 发送信息
+const sendHandle = async (event: KeyboardEvent) => {
+  if (!sendStatus.value) return
+  if (chatList.value.length === 0) await createChatHandle()
+  xhr = new XMLHttpRequest()
+  xhr.open('POST', 'http://127.0.0.1:5173/api/conversation/send')
+  xhr.setRequestHeader('Content-Type', 'application/json')
+  xhr.setRequestHeader('Authorization', 'Bearer ' + userStore.token)
+  let lastResponseLength = 0
+  xhr.onprogress = function (event) {
+    const newResponse = xhr.responseText.substring(lastResponseLength)
+    // 更新已读取的响应长度，以便下次从新的位置开始读取
+    lastResponseLength = xhr.responseText.length
+    // 处理最新接收到的数据片段
+    const curData = newResponse.split(' ')[2]
+    const res = curData && JSON.parse(curData)
+    console.log(res)
+    scrollbarRef.value.scrollTop(Number.MAX_SAFE_INTEGER)
+    if (res) conversationList.value[conversationList.value.length - 1].aiMessage += res?.data
   }
-  // const eventSource = EventSource('/conversation/send')
-  // eventSource.onmessage = function (event) {
-  //   console.log('message', event.data)
-  // }
-  questions.push(textareaValue.value)
-  textareaValue.value = ''
+  xhr.onloadend = function () {
+    saveConversationFetch({
+      messageId: messageId,
+      chatId: chatList.value[curActiveChat.value].id
+    })
+    sendStatus.value = true
+  }
+
+  const messageId = Date.now() + Math.floor(Math.random() * 100000) + ''
+  //data是要发送给后台的数据
+  let data = JSON.stringify({
+    chatId: 1,
+    userMessage: userMessageInputVal.value,
+    messageId
+  })
+  xhr.send(data)
+  // 禁用按钮
+  sendStatus.value = false
+  conversationList.value.push({ userMessage: userMessageInputVal.value, aiMessage: '' })
+  userMessageInputVal.value = ''
   event.preventDefault()
 }
 
-onMounted(() => {
+const toggleChatHandle = async ({ index, chatId }) => {
+  // 关闭请求
+  xhr && xhr.abort()
+  curActiveChat.value = index
+  const res = await conversationListFetch(chatId)
+  conversationList.value = res.data.list
+  setTimeout(() => {
+    scrollbarRef.value.scrollTop(Number.MAX_SAFE_INTEGER)
+  }, 10)
+}
+
+onMounted(async () => {
   aTextareaRef.value.textareaRef.addEventListener('keydown', (event: KeyboardEvent) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       sendHandle(event)
     }
   })
+})
+
+watch(chatList, async () => {
+  const res = await conversationListFetch(chatList.value[0]?.id)
+  conversationList.value = res.data.list
+  setTimeout(() => {
+    scrollbarRef.value.scrollTop(Number.MAX_SAFE_INTEGER)
+  }, 10)
 })
 </script>
 
@@ -72,24 +151,30 @@ onMounted(() => {
       <a-layout-sider style="padding: 10px; width: 332px">
         <div style="display: flex">
           <a-input-search :style="{ width: '320px' }" placeholder="搜索对话记录" />
-          <a-button type="primary" style="margin-left: 8px" @click="createChat">
+          <a-button type="primary" style="margin-left: 8px" @click="createChatHandle">
             <template #icon>
               <icon-plus-circle />
             </template>
             <template #default> 新建聊天 </template>
           </a-button>
         </div>
-        <ul class="dialog-container">
+        <ul class="chat-container">
           <li
+            @click="toggleChatHandle({ index, chatId: item.id })"
+            v-for="(item, index) in chatList"
             :class="{
-              'dialog-item': true,
-              'active-dialog': curChatKey === item.key
+              'chat-item': true,
+              'active-chat': index === curActiveChat
             }"
-            @click="dialogClickHandle(item.key as number)"
-            v-for="item in conversationRecord"
-            :key="item.key"
+            :key="item.id"
           >
-            {{ item.name }}
+            <span>{{ item.name }}</span>
+            <div>
+              <span class="edit-chat-btn" @click.stop="editChatHandle(item)"><icon-edit /></span>
+              <span class="delete-chat-btn" @click.stop="deleteChatHandle(item)">
+                <icon-delete />
+              </span>
+            </div>
           </li>
         </ul>
       </a-layout-sider>
@@ -100,22 +185,24 @@ onMounted(() => {
           </a-popconfirm>
         </a-layout-header>
         <a-layout-content class="layout-content">
-          <ul>
-            <li class="content-item" v-for="(item, index) in questions" :key="index">
-              <div class="user-content">
-                <a-avatar :style="{ backgroundColor: '#14a9f8' }">user</a-avatar>
-                <p class="user-text">{{ item }}</p>
-              </div>
-              <div class="ai-content">
-                <a-avatar :style="{ backgroundColor: '#14a9f8' }">AI</a-avatar>
-                <p class="ai-text">{{ item }}</p>
-              </div>
-            </li>
-          </ul>
+          <a-scrollbar style="height: 70vh; overflow: auto" ref="scrollbarRef">
+            <ul>
+              <li class="content-item" v-for="(item, index) in conversationList" :key="index">
+                <div class="user-content">
+                  <a-avatar :style="{ backgroundColor: '#14a9f8' }">user</a-avatar>
+                  <p class="user-text">{{ item.userMessage }}</p>
+                </div>
+                <div class="ai-content">
+                  <a-avatar :style="{ backgroundColor: '#14a9f8' }">AI</a-avatar>
+                  <p class="ai-text">{{ item.aiMessage }}</p>
+                </div>
+              </li>
+            </ul>
+          </a-scrollbar>
         </a-layout-content>
         <a-layout-footer class="layout-footer">
           <div class="send-container">
-            <a-button type="primary" @click="sendHandle">
+            <a-button type="primary" @click="sendHandle" :disabled="!sendStatus">
               <template #icon>
                 <icon-send />
               </template>
@@ -123,7 +210,7 @@ onMounted(() => {
             </a-button>
           </div>
           <a-textarea
-            v-model:model-value="textareaValue"
+            v-model:model-value="userMessageInputVal"
             ref="aTextareaRef"
             placeholder="请输入内容"
             :max-length="300"
@@ -137,6 +224,14 @@ onMounted(() => {
         /></a-layout-footer>
       </a-layout>
     </a-layout>
+    <!-- 对话框 -->
+    <a-modal v-model:visible="visible" title="编辑聊天" @before-ok="handleBeforeOk">
+      <a-form :model="form">
+        <a-form-item field="name" label="聊天名字">
+          <a-input v-model="form.name" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
@@ -158,16 +253,27 @@ onMounted(() => {
 .send-container {
   text-align: right;
 }
-.dialog-container {
-  .dialog-item {
+.chat-container {
+  .chat-item {
     border-radius: 8px;
     background-color: var(--color-fill-1);
     margin-top: 10px;
     border: 1px solid var(--color-border-1);
     font-size: 14px;
     padding: 12px;
+    display: flex;
+    justify-content: space-between;
+    .edit-chat-btn {
+      margin-right: 10px;
+      &:hover {
+        color: rgb(var(--primary-7));
+      }
+    }
+    .delete-chat-btn:hover {
+      color: rgb(var(--danger-6));
+    }
   }
-  .active-dialog {
+  .active-chat {
     color: rgb(var(--arcoblue-6));
     border-color: rgb(var(--arcoblue-6));
     background-color: rgb(var(--arcoblue-1));
@@ -204,4 +310,5 @@ onMounted(() => {
   }
 }
 </style>
-import type { useChatStore } from '@/stores/modules/chat'
+, watchimport type { options } from 'node_modules/axios/index.cjs' import type { options } from
+'node_modules/axios/index.cjs'

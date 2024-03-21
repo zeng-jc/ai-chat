@@ -1,7 +1,7 @@
 import { createApp } from 'vue'
 import ArcoVue from '@arco-design/web-vue'
 import App from './App.vue'
-import './assets/reset.css'
+import './assets/index.less'
 import router from './router'
 // 额外引入图标库
 import ArcoVueIcon from '@arco-design/web-vue/es/icon'
