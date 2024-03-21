@@ -15,13 +15,15 @@ let curEditChatId = null
 let xhr = null
 const router = useRouter()
 const aTextareaRef = ref()
-const userMessageInputVal = ref<string>('')
-const conversationList = ref<any[]>([])
-const visible = ref<boolean>(null)
-const curActiveChat = ref(0) //当前选中的聊天
+const userMessageInputVal = ref<string>('') // 输入框内容
+const conversationList = ref<any[]>([]) // 对话列表
+const visible = ref<boolean>(null) // 编辑对话框显示隐藏状态
+const curActiveChat = ref(0) // 当前选中的聊天
+// 编辑对话框中的表单
 const form = reactive({
   name: ''
 })
+// 滚动条
 const scrollbarRef = ref('')
 // 发送状态（true可发送）
 const sendStatus = ref<boolean>(true)
@@ -41,6 +43,7 @@ const logout = () => {
 // 新建聊天
 const createChatHandle = async () => {
   await chatStore.createChat()
+  curActiveChat.value = 0
 }
 
 // 删除聊天
@@ -71,13 +74,10 @@ const handleBeforeOk = async () => {
   visible.value = false
   Message.success('编辑成功')
 }
-const scrollToHandle = (options, y) => {
-  console.log('options, y', options, y)
-}
+
 // 发送信息
 const sendHandle = async (event: KeyboardEvent) => {
   if (!sendStatus.value) return
-  if (chatList.value.length === 0) await createChatHandle()
   xhr = new XMLHttpRequest()
   xhr.open('POST', 'http://127.0.0.1:5173/api/conversation/send')
   xhr.setRequestHeader('Content-Type', 'application/json')
@@ -90,7 +90,6 @@ const sendHandle = async (event: KeyboardEvent) => {
     // 处理最新接收到的数据片段
     const curData = newResponse.split(' ')[2]
     const res = curData && JSON.parse(curData)
-    console.log(res)
     scrollbarRef.value.scrollTop(Number.MAX_SAFE_INTEGER)
     if (res) conversationList.value[conversationList.value.length - 1].aiMessage += res?.data
   }
@@ -112,6 +111,8 @@ const sendHandle = async (event: KeyboardEvent) => {
   xhr.send(data)
   // 禁用按钮
   sendStatus.value = false
+  // console.log('conversationList.value', conversationList.value)
+  // conversationList.value ?? (conversationList.value = [{ userMessage: userMessageInputVal.value, aiMessage: '' }])
   conversationList.value.push({ userMessage: userMessageInputVal.value, aiMessage: '' })
   userMessageInputVal.value = ''
   event.preventDefault()
@@ -128,7 +129,8 @@ const toggleChatHandle = async ({ index, chatId }) => {
   }, 10)
 }
 
-onMounted(async () => {
+onMounted(() => {
+  console.log(aTextareaRef.value)
   aTextareaRef.value.textareaRef.addEventListener('keydown', (event: KeyboardEvent) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       sendHandle(event)
@@ -168,7 +170,12 @@ watch(chatList, async () => {
             }"
             :key="item.id"
           >
-            <span>{{ item.name }}</span>
+            <div>
+              <div>{{ item.name }}</div>
+              <div style="margin-top: 5px; font-size: 12px; color: var(--color-neutral-8)">
+                {{ item.createTime }}
+              </div>
+            </div>
             <div>
               <span class="edit-chat-btn" @click.stop="editChatHandle(item)"><icon-edit /></span>
               <span class="delete-chat-btn" @click.stop="deleteChatHandle(item)">
@@ -178,50 +185,63 @@ watch(chatList, async () => {
           </li>
         </ul>
       </a-layout-sider>
+
       <a-layout>
         <a-layout-header class="layout-header">
           <a-popconfirm content="你确定要退出登录吗?" type="warning" @ok="logout" position="left">
             <a-button type="outline">退出登录</a-button>
           </a-popconfirm>
         </a-layout-header>
-        <a-layout-content class="layout-content">
-          <a-scrollbar style="height: 70vh; overflow: auto" ref="scrollbarRef">
-            <ul>
-              <li class="content-item" v-for="(item, index) in conversationList" :key="index">
-                <div class="user-content">
-                  <a-avatar :style="{ backgroundColor: '#14a9f8' }">user</a-avatar>
-                  <p class="user-text">{{ item.userMessage }}</p>
-                </div>
-                <div class="ai-content">
-                  <a-avatar :style="{ backgroundColor: '#14a9f8' }">AI</a-avatar>
-                  <p class="ai-text">{{ item.aiMessage }}</p>
-                </div>
-              </li>
-            </ul>
-          </a-scrollbar>
-        </a-layout-content>
-        <a-layout-footer class="layout-footer">
-          <div class="send-container">
-            <a-button type="primary" @click="sendHandle" :disabled="!sendStatus">
-              <template #icon>
-                <icon-send />
-              </template>
-              <template #default> 发送 </template>
+        <a-layout-content
+          style="display: flex; align-items: center; justify-content: center"
+          v-show="chatList.length === 0"
+        >
+          <div>
+            <a-empty description="AI聊天" /><a-button type="primary" @click="createChatHandle">
+              + 新建AI聊天
             </a-button>
           </div>
-          <a-textarea
-            v-model:model-value="userMessageInputVal"
-            ref="aTextareaRef"
-            placeholder="请输入内容"
-            :max-length="300"
-            show-word-limit
-            :auto-size="{
-              minRows: 7,
-              maxRows: 7
-            }"
-            allow-clear
-            style="margin-top: 20px"
-        /></a-layout-footer>
+        </a-layout-content>
+        <div v-show="chatList.length !== 0">
+          <a-layout-content class="layout-content">
+            <a-scrollbar style="height: 70vh; overflow: auto" ref="scrollbarRef">
+              <ul>
+                <li class="content-item" v-for="(item, index) in conversationList" :key="index">
+                  <div class="user-content">
+                    <a-avatar :style="{ backgroundColor: '#14a9f8' }">user</a-avatar>
+                    <p class="user-text">{{ item.userMessage }}</p>
+                  </div>
+                  <div class="ai-content">
+                    <a-avatar :style="{ backgroundColor: '#14a9f8' }">AI</a-avatar>
+                    <p class="ai-text">{{ item.aiMessage }}</p>
+                  </div>
+                </li>
+              </ul>
+            </a-scrollbar>
+          </a-layout-content>
+          <a-layout-footer class="layout-footer">
+            <div class="send-container">
+              <a-button type="primary" @click="sendHandle" :disabled="!sendStatus">
+                <template #icon>
+                  <icon-send />
+                </template>
+                <template #default> 发送 </template>
+              </a-button>
+            </div>
+            <a-textarea
+              v-model:model-value="userMessageInputVal"
+              ref="aTextareaRef"
+              placeholder="请输入内容"
+              :max-length="300"
+              show-word-limit
+              :auto-size="{
+                minRows: 7,
+                maxRows: 7
+              }"
+              allow-clear
+              style="margin-top: 20px"
+          /></a-layout-footer>
+        </div>
       </a-layout>
     </a-layout>
     <!-- 对话框 -->
@@ -263,6 +283,8 @@ watch(chatList, async () => {
     padding: 12px;
     display: flex;
     justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
     .edit-chat-btn {
       margin-right: 10px;
       &:hover {
@@ -310,5 +332,3 @@ watch(chatList, async () => {
   }
 }
 </style>
-, watchimport type { options } from 'node_modules/axios/index.cjs' import type { options } from
-'node_modules/axios/index.cjs'
