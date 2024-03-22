@@ -346,6 +346,7 @@ watch(chatList, async () => {
 }
 .content-item {
   padding: 7px;
+  padding-right: 0;
   .user-content,
   .ai-content {
     display: flex;
