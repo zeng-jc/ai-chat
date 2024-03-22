@@ -160,9 +160,10 @@ watch(chatList, async () => {
 <template>
   <div class="main">
     <a-layout class="layout-container">
+      <div class="mobile-sidebar-mask" v-if="!collapsed" @click="collapsed = !collapsed"></div>
       <a-layout-sider
         class="layout-sider"
-        style="padding: 0 5px 0 20px; position: relative"
+        style="padding: 0 5px 0 20px; position: relative; z-index: 20"
         :width="312"
         hide-trigger
         collapsible
@@ -235,17 +236,25 @@ watch(chatList, async () => {
         </a-layout-content>
         <a-layout-content class="layout-content" v-show="chatList.length !== 0">
           <a-scrollbar
-            style="height: calc(100vh - 32px - 219px); overflow: auto"
+            style="height: calc(100vh - 32px - 229px); overflow: auto"
             ref="scrollbarRef"
           >
             <ul>
               <li class="content-item" v-for="(item, index) in conversationList" :key="index">
                 <div class="user-content">
-                  <a-avatar :style="{ backgroundColor: '#14a9f8' }">user</a-avatar>
+                  <a-avatar
+                    :style="{ backgroundColor: '#14a9f8', minWidth: '40px', minHeight: '40px' }"
+                  >
+                    user
+                  </a-avatar>
                   <p class="user-text">{{ item.userMessage }}</p>
                 </div>
                 <div class="ai-content">
-                  <a-avatar :style="{ backgroundColor: '#14a9f8' }">AI</a-avatar>
+                  <a-avatar
+                    :style="{ backgroundColor: '#14a9f8', minWidth: '40px', minHeight: '40px' }"
+                  >
+                    AI
+                  </a-avatar>
                   <p class="ai-text">{{ item.aiMessage }}</p>
                 </div>
               </li>
@@ -254,7 +263,12 @@ watch(chatList, async () => {
         </a-layout-content>
         <a-layout-footer class="layout-footer" v-show="chatList.length !== 0">
           <div class="send-container">
-            <a-button type="primary" @click="sendHandle" :disabled="!sendStatus">
+            <a-button
+              type="primary"
+              @click="sendHandle"
+              :disabled="!sendStatus"
+              style="margin: 15px 0"
+            >
               <template #icon>
                 <icon-send />
               </template>
@@ -272,7 +286,6 @@ watch(chatList, async () => {
               maxRows: 7
             }"
             allow-clear
-            style="margin-top: 20px"
         /></a-layout-footer>
       </a-layout>
     </a-layout>
