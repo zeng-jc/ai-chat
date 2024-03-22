@@ -3,9 +3,9 @@ import verifycodeSignin from './verifycode-signin.vue'
 import passwordSignin from './password-signin.vue'
 import { reactive, ref } from 'vue'
 
-const curTabActive = ref(0)
+const curTabActive = ref<number>(0)
 const tabs = reactive(['密码登录', '验证码登录'])
-const tabClick = (index) => {
+const tabClick = (index: number) => {
   curTabActive.value = index
 }
 </script>

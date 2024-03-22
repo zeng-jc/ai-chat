@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { saveConversationFetch, conversationListFetch } from '@/service/modules/conversation'
-import { Message, Modal } from '@arco-design/web-vue'
+import { Message, Modal, type ScrollbarInstance } from '@arco-design/web-vue'
 import useUserStore from '@/stores/modules/user'
 import useChatStore from '@/stores/modules/chat'
 import { useRouter } from 'vue-router'
@@ -11,23 +11,24 @@ const userStore = useUserStore()
 const chatStore = useChatStore()
 chatStore.getChatList()
 
-let curEditChatId = null
-let xhr = null
+let curEditChatId: number
+let xhr: XMLHttpRequest
 const router = useRouter()
 const aTextareaRef = ref()
 const userMessageInputVal = ref<string>('') // 输入框内容
 const conversationList = ref<any[]>([]) // 对话列表
-const visible = ref<boolean>(null) // 编辑对话框显示隐藏状态
+const visible = ref<boolean>(false) // 编辑对话框显示隐藏状态
 const curActiveChat = ref(0) // 当前选中的聊天
+const collapsed = ref<boolean>(false)
 // 编辑对话框中的表单
 const form = reactive({
   name: ''
 })
 // 滚动条
-const scrollbarRef = ref('')
+const scrollbarRef = ref<ScrollbarInstance>()
 // 发送状态（true可发送）
 const sendStatus = ref<boolean>(true)
-const { chatList } = storeToRefs<{ [prop: string]: any }[]>(chatStore)
+const { chatList } = storeToRefs(chatStore)
 
 // 退出登录
 const logout = () => {
@@ -47,7 +48,7 @@ const createChatHandle = async () => {
 }
 
 // 删除聊天
-const deleteChatHandle = ({ id, name }) => {
+const deleteChatHandle = ({ id, name }: { id: number; name: string }) => {
   Modal.warning({
     title: () => h('span', { style: 'font-weight: 600;' }, '提示'),
     content: () => h('span', { style: 'font-weight: 600;' }, `确定要永久删除 "${name}" 吗？`),
@@ -57,13 +58,14 @@ const deleteChatHandle = ({ id, name }) => {
     onCancel: () => {},
     onOk: async () => {
       await chatStore.deleteChat(id)
+      curActiveChat.value = 0
       Message.success('删除成功')
     }
   })
 }
 
 // 编辑聊天
-const editChatHandle = ({ id, name }) => {
+const editChatHandle = ({ id, name }: { id: number; name: string }) => {
   visible.value = true
   curEditChatId = id
   form.name = name
@@ -76,21 +78,21 @@ const handleBeforeOk = async () => {
 }
 
 // 发送信息
-const sendHandle = async (event: KeyboardEvent) => {
+const sendHandle = async (event: Event) => {
   if (!sendStatus.value) return
   xhr = new XMLHttpRequest()
   xhr.open('POST', 'http://127.0.0.1:5173/api/conversation/send')
   xhr.setRequestHeader('Content-Type', 'application/json')
   xhr.setRequestHeader('Authorization', 'Bearer ' + userStore.token)
   let lastResponseLength = 0
-  xhr.onprogress = function (event) {
+  xhr.onprogress = function () {
     const newResponse = xhr.responseText.substring(lastResponseLength)
     // 更新已读取的响应长度，以便下次从新的位置开始读取
     lastResponseLength = xhr.responseText.length
     // 处理最新接收到的数据片段
     const curData = newResponse.split(' ')[2]
     const res = curData && JSON.parse(curData)
-    scrollbarRef.value.scrollTop(Number.MAX_SAFE_INTEGER)
+    scrollbarRef.value?.scrollTop(Number.MAX_SAFE_INTEGER)
     if (res) conversationList.value[conversationList.value.length - 1].aiMessage += res?.data
   }
   xhr.onloadend = function () {
@@ -118,14 +120,14 @@ const sendHandle = async (event: KeyboardEvent) => {
   event.preventDefault()
 }
 
-const toggleChatHandle = async ({ index, chatId }) => {
+const toggleChatHandle = async ({ index, chatId }: { index: number; chatId: number }) => {
   // 关闭请求
   xhr && xhr.abort()
   curActiveChat.value = index
   const res = await conversationListFetch(chatId)
   conversationList.value = res.data.list
   setTimeout(() => {
-    scrollbarRef.value.scrollTop(Number.MAX_SAFE_INTEGER)
+    scrollbarRef.value?.scrollTop(Number.MAX_SAFE_INTEGER)
   }, 10)
 }
 
@@ -142,7 +144,7 @@ watch(chatList, async () => {
   const res = await conversationListFetch(chatList.value[0]?.id)
   conversationList.value = res.data.list
   setTimeout(() => {
-    scrollbarRef.value.scrollTop(Number.MAX_SAFE_INTEGER)
+    scrollbarRef.value?.scrollTop(Number.MAX_SAFE_INTEGER)
   }, 10)
 })
 </script>
@@ -150,7 +152,13 @@ watch(chatList, async () => {
 <template>
   <div class="main">
     <a-layout class="layout-container">
-      <a-layout-sider style="padding: 10px; width: 332px">
+      <a-layout-sider
+        style="padding: 20px"
+        :width="312"
+        hide-trigger
+        collapsible
+        :collapsed="collapsed"
+      >
         <div style="display: flex">
           <a-input-search :style="{ width: '320px' }" placeholder="搜索对话记录" />
           <a-button type="primary" style="margin-left: 8px" @click="createChatHandle">
@@ -160,30 +168,32 @@ watch(chatList, async () => {
             <template #default> 新建聊天 </template>
           </a-button>
         </div>
-        <ul class="chat-container">
-          <li
-            @click="toggleChatHandle({ index, chatId: item.id })"
-            v-for="(item, index) in chatList"
-            :class="{
-              'chat-item': true,
-              'active-chat': index === curActiveChat
-            }"
-            :key="item.id"
-          >
-            <div>
-              <div>{{ item.name }}</div>
-              <div style="margin-top: 5px; font-size: 12px; color: var(--color-neutral-8)">
-                {{ item.createTime }}
+        <a-scrollbar>
+          <ul class="chat-container">
+            <li
+              @click="toggleChatHandle({ index, chatId: item.id })"
+              v-for="(item, index) in chatList"
+              :class="{
+                'chat-item': true,
+                'active-chat': index === curActiveChat
+              }"
+              :key="item.id"
+            >
+              <div>
+                <div>{{ item.name }}</div>
+                <div style="margin-top: 5px; font-size: 12px; color: var(--color-neutral-8)">
+                  {{ item.createTime }}
+                </div>
               </div>
-            </div>
-            <div>
-              <span class="edit-chat-btn" @click.stop="editChatHandle(item)"><icon-edit /></span>
-              <span class="delete-chat-btn" @click.stop="deleteChatHandle(item)">
-                <icon-delete />
-              </span>
-            </div>
-          </li>
-        </ul>
+              <div>
+                <span class="edit-chat-btn" @click.stop="editChatHandle(item)"><icon-edit /></span>
+                <span class="delete-chat-btn" @click.stop="deleteChatHandle(item)">
+                  <icon-delete />
+                </span>
+              </div>
+            </li>
+          </ul>
+        </a-scrollbar>
       </a-layout-sider>
 
       <a-layout>

@@ -6,8 +6,12 @@ import {
 } from '@/service/modules/chat'
 import { defineStore } from 'pinia'
 
+interface ChatState {
+  chatList: { id: number; userId: number; name: string; createTime: string }[]
+}
+
 const useChatStore = defineStore('chat', {
-  state: () => ({
+  state: (): ChatState => ({
     chatList: []
   }),
   actions: {
