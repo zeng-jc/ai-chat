@@ -39,22 +39,22 @@ const tabClick = (index: number) => {
   background-color: var(--theme-bgk1);
   display: flex;
   justify-content: center;
-  margin-top: 18vh;
 }
 .signin-section {
+  margin: 18vh 10px 0;
   background-color: #fff;
-  width: 700px;
   display: flex;
   border-radius: 8px;
   overflow: hidden;
+  flex: 1;
+  max-width: 700px;
   box-shadow: 0 0 10px -5px #86909c;
-  height: fit-content;
   .left-section,
   .right-section {
     flex: 1;
   }
   .left-section {
-    padding: 30px 30px;
+    padding: 18px 20px;
     .login-mode {
       font-size: 14px;
       color: #c9cdd4;
@@ -96,5 +96,11 @@ const tabClick = (index: number) => {
   font-size: 14px;
   color: rgb(var(--primary-6));
   border-bottom: 2px solid rgb(var(--primary-6));
+}
+
+@media screen and (max-width: 576px) {
+  .right-section {
+    display: none !important;
+  }
 }
 </style>

@@ -131,6 +131,14 @@ const toggleChatHandle = async ({ index, chatId }: { index: number; chatId: numb
   }, 10)
 }
 
+const onCollapse = () => {
+  collapsed.value = !collapsed.value
+}
+
+const onBreakpoint = () => {
+  collapsed.value = !collapsed.value
+}
+
 onMounted(() => {
   console.log(aTextareaRef.value)
   aTextareaRef.value.textareaRef.addEventListener('keydown', (event: KeyboardEvent) => {
@@ -153,22 +161,36 @@ watch(chatList, async () => {
   <div class="main">
     <a-layout class="layout-container">
       <a-layout-sider
-        style="padding: 20px"
+        class="layout-sider"
+        style="padding: 0 5px 0 20px; position: relative"
         :width="312"
         hide-trigger
         collapsible
         :collapsed="collapsed"
+        :collapsed-width="0"
+        breakpoint="lg"
+        @breakpoint="onBreakpoint"
       >
-        <div style="display: flex">
-          <a-input-search :style="{ width: '320px' }" placeholder="搜索对话记录" />
+        <!-- 侧边栏控制按钮 -->
+        <a-button
+          style="position: absolute; top: 16px; right: -16px"
+          type="dashed"
+          shape="circle"
+          @click="onCollapse"
+        >
+          <IconCaretRight v-if="collapsed" />
+          <IconCaretLeft v-else />
+        </a-button>
+        <div style="display: flex; margin: 15px 14px 15px 0">
+          <a-input-search placeholder="搜索对话记录" />
           <a-button type="primary" style="margin-left: 8px" @click="createChatHandle">
-            <template #icon>
+            <!-- <template #icon>
               <icon-plus-circle />
-            </template>
+            </template> -->
             <template #default> 新建聊天 </template>
           </a-button>
         </div>
-        <a-scrollbar>
+        <a-scrollbar style="height: calc(99vh - 62px); overflow: auto">
           <ul class="chat-container">
             <li
               @click="toggleChatHandle({ index, chatId: item.id })"
@@ -195,7 +217,6 @@ watch(chatList, async () => {
           </ul>
         </a-scrollbar>
       </a-layout-sider>
-
       <a-layout>
         <a-layout-header class="layout-header">
           <a-popconfirm content="你确定要退出登录吗?" type="warning" @ok="logout" position="left">
@@ -212,46 +233,47 @@ watch(chatList, async () => {
             </a-button>
           </div>
         </a-layout-content>
-        <div v-show="chatList.length !== 0">
-          <a-layout-content class="layout-content">
-            <a-scrollbar style="height: 70vh; overflow: auto" ref="scrollbarRef">
-              <ul>
-                <li class="content-item" v-for="(item, index) in conversationList" :key="index">
-                  <div class="user-content">
-                    <a-avatar :style="{ backgroundColor: '#14a9f8' }">user</a-avatar>
-                    <p class="user-text">{{ item.userMessage }}</p>
-                  </div>
-                  <div class="ai-content">
-                    <a-avatar :style="{ backgroundColor: '#14a9f8' }">AI</a-avatar>
-                    <p class="ai-text">{{ item.aiMessage }}</p>
-                  </div>
-                </li>
-              </ul>
-            </a-scrollbar>
-          </a-layout-content>
-          <a-layout-footer class="layout-footer">
-            <div class="send-container">
-              <a-button type="primary" @click="sendHandle" :disabled="!sendStatus">
-                <template #icon>
-                  <icon-send />
-                </template>
-                <template #default> 发送 </template>
-              </a-button>
-            </div>
-            <a-textarea
-              v-model:model-value="userMessageInputVal"
-              ref="aTextareaRef"
-              placeholder="请输入内容"
-              :max-length="300"
-              show-word-limit
-              :auto-size="{
-                minRows: 7,
-                maxRows: 7
-              }"
-              allow-clear
-              style="margin-top: 20px"
-          /></a-layout-footer>
-        </div>
+        <a-layout-content class="layout-content" v-show="chatList.length !== 0">
+          <a-scrollbar
+            style="height: calc(100vh - 32px - 219px); overflow: auto"
+            ref="scrollbarRef"
+          >
+            <ul>
+              <li class="content-item" v-for="(item, index) in conversationList" :key="index">
+                <div class="user-content">
+                  <a-avatar :style="{ backgroundColor: '#14a9f8' }">user</a-avatar>
+                  <p class="user-text">{{ item.userMessage }}</p>
+                </div>
+                <div class="ai-content">
+                  <a-avatar :style="{ backgroundColor: '#14a9f8' }">AI</a-avatar>
+                  <p class="ai-text">{{ item.aiMessage }}</p>
+                </div>
+              </li>
+            </ul>
+          </a-scrollbar>
+        </a-layout-content>
+        <a-layout-footer class="layout-footer" v-show="chatList.length !== 0">
+          <div class="send-container">
+            <a-button type="primary" @click="sendHandle" :disabled="!sendStatus">
+              <template #icon>
+                <icon-send />
+              </template>
+              <template #default> 发送 </template>
+            </a-button>
+          </div>
+          <a-textarea
+            v-model:model-value="userMessageInputVal"
+            ref="aTextareaRef"
+            placeholder="请输入内容"
+            :max-length="300"
+            show-word-limit
+            :auto-size="{
+              minRows: 7,
+              maxRows: 7
+            }"
+            allow-clear
+            style="margin-top: 20px"
+        /></a-layout-footer>
       </a-layout>
     </a-layout>
     <!-- 对话框 -->
@@ -267,9 +289,7 @@ watch(chatList, async () => {
 
 <style lang="less" scoped>
 .layout-container {
-  height: 99vh;
-  width: 99vw;
-  margin: auto;
+  height: 100vh;
 }
 .layout-header {
   display: flex;
@@ -287,7 +307,7 @@ watch(chatList, async () => {
   .chat-item {
     border-radius: 8px;
     background-color: var(--color-fill-1);
-    margin-top: 10px;
+    margin: 0 14px 10px 0;
     border: 1px solid var(--color-border-1);
     font-size: 14px;
     padding: 12px;
