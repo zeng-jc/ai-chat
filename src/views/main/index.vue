@@ -22,6 +22,7 @@ const conversationList = ref<any[]>([]) // 对话列表
 const visible = ref<boolean>(false) // 编辑对话框显示隐藏状态
 const collapsed = ref<boolean>(false)
 const searchInputVal = ref<string>('')
+const editorFormRef = ref()
 // 编辑对话框中的表单
 const form = reactive({
   name: ''
@@ -86,12 +87,18 @@ const editChatHandle = ({ id, name }: { id: number; name: string }) => {
   visible.value = true
   curEditChatId = id
   form.name = name
+  editorFormRef.value.clearValidate()
 }
 // 编辑确认
-const handleBeforeOk = async () => {
-  await chatStore.editChat(curEditChatId, form)
-  visible.value = false
-  Message.success('编辑成功')
+const handleOk = () => {
+  editorFormRef.value.validate().then(async (error: any) => {
+    visible.value = true
+    if (!error) {
+      await chatStore.editChat(curEditChatId, form)
+      visible.value = false
+      Message.success('编辑成功')
+    }
+  })
 }
 
 // 发送信息
@@ -321,9 +328,9 @@ watch(chatList, async () => {
       </a-layout>
     </a-layout>
     <!-- 对话框 -->
-    <a-modal v-model:visible="visible" title="编辑聊天" @before-ok="handleBeforeOk">
-      <a-form :model="form">
-        <a-form-item field="name" label="聊天名字">
+    <a-modal width="auto" v-model:visible="visible" title="编辑聊天" @ok="handleOk">
+      <a-form :model="form" ref="editorFormRef">
+        <a-form-item field="name" label="聊天名字" :required="true" message="聊天名字必填">
           <a-input v-model="form.name" />
         </a-form-item>
       </a-form>
