@@ -26,9 +26,10 @@ export function deleteChatFetch(chatId: number) {
 }
 
 // 查询聊天列表
-export function getChatListFetch() {
+export function getChatListFetch(query?: { keywords: string }) {
   return service.request({
     url: '/chat/list',
-    method: 'get'
+    method: 'get',
+    params: query
   })
 }

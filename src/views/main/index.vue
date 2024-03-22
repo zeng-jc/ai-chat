@@ -7,6 +7,8 @@ import { useRouter } from 'vue-router'
 import { ref, onMounted, reactive, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { h } from 'vue'
+import _debounce from '@/utils/debounce'
+
 const userStore = useUserStore()
 const chatStore = useChatStore()
 chatStore.getChatList()
@@ -18,8 +20,8 @@ const aTextareaRef = ref()
 const userMessageInputVal = ref<string>('') // 输入框内容
 const conversationList = ref<any[]>([]) // 对话列表
 const visible = ref<boolean>(false) // 编辑对话框显示隐藏状态
-const curActiveChat = ref(0) // 当前选中的聊天
 const collapsed = ref<boolean>(false)
+const searchInputVal = ref<string>('')
 // 编辑对话框中的表单
 const form = reactive({
   name: ''
@@ -29,7 +31,10 @@ const scrollbarRef = ref<ScrollbarInstance>()
 // 发送状态（true可发送）
 const sendStatus = ref<boolean>(true)
 const { chatList } = storeToRefs(chatStore)
-
+// 当前选中的聊天
+const curActiveChat = reactive<{ id?: number; index: number }>({
+  index: 0
+})
 // 退出登录
 const logout = () => {
   // 1.执行退出登录接口
@@ -41,15 +46,22 @@ const logout = () => {
   Message.success('退出登录成功！')
 }
 
+// 设置curActiveChat
+const setCurActiveChat = ({ index, id }: { index: number; id: number }) => {
+  curActiveChat.index = index
+  curActiveChat.id = id
+}
+
 // 新建聊天
 const createChatHandle = async () => {
   await chatStore.createChat()
-  curActiveChat.value = 0
+  setCurActiveChat({ index: 0, id: chatList.value[0].id })
 }
 
 // 删除聊天
-const deleteChatHandle = ({ id, name }: { id: number; name: string }) => {
+const deleteChatHandle = ({ id, name }: { id: number; name: string }, index: number) => {
   Modal.warning({
+    width: 'auto',
     title: () => h('span', { style: 'font-weight: 600;' }, '提示'),
     content: () => h('span', { style: 'font-weight: 600;' }, `确定要永久删除 "${name}" 吗？`),
     hideCancel: false,
@@ -57,8 +69,13 @@ const deleteChatHandle = ({ id, name }: { id: number; name: string }) => {
     okButtonProps: { size: 'small' },
     onCancel: () => {},
     onOk: async () => {
+      console.log(index, curActiveChat.index)
+      if (index === curActiveChat.index) {
+        setCurActiveChat({ index: 0, id: chatList.value[0].id })
+      } else if (index < curActiveChat.index) {
+        curActiveChat.index -= 1
+      }
       await chatStore.deleteChat(id)
-      curActiveChat.value = 0
       Message.success('删除成功')
     }
   })
@@ -96,10 +113,11 @@ const sendHandle = async (event: Event) => {
     if (res) conversationList.value[conversationList.value.length - 1].aiMessage += res?.data
   }
   xhr.onloadend = function () {
-    saveConversationFetch({
-      messageId: messageId,
-      chatId: chatList.value[curActiveChat.value].id
-    })
+    curActiveChat.id &&
+      saveConversationFetch({
+        messageId: messageId,
+        chatId: curActiveChat.id
+      })
     sendStatus.value = true
   }
 
@@ -113,8 +131,6 @@ const sendHandle = async (event: Event) => {
   xhr.send(data)
   // 禁用按钮
   sendStatus.value = false
-  // console.log('conversationList.value', conversationList.value)
-  // conversationList.value ?? (conversationList.value = [{ userMessage: userMessageInputVal.value, aiMessage: '' }])
   conversationList.value.push({ userMessage: userMessageInputVal.value, aiMessage: '' })
   userMessageInputVal.value = ''
   event.preventDefault()
@@ -123,7 +139,7 @@ const sendHandle = async (event: Event) => {
 const toggleChatHandle = async ({ index, chatId }: { index: number; chatId: number }) => {
   // 关闭请求
   xhr && xhr.abort()
-  curActiveChat.value = index
+  setCurActiveChat({ index, id: chatId })
   const res = await conversationListFetch(chatId)
   conversationList.value = res.data.list
   setTimeout(() => {
@@ -139,8 +155,13 @@ const onBreakpoint = () => {
   collapsed.value = !collapsed.value
 }
 
+const searchChatHandle = _debounce(() => {
+  chatStore.getChatList({ keywords: searchInputVal.value })
+  curActiveChat.index = 0
+  delete curActiveChat.id
+}, 500)
+
 onMounted(() => {
-  console.log(aTextareaRef.value)
   aTextareaRef.value.textareaRef.addEventListener('keydown', (event: KeyboardEvent) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       sendHandle(event)
@@ -149,7 +170,7 @@ onMounted(() => {
 })
 
 watch(chatList, async () => {
-  const res = await conversationListFetch(chatList.value[0]?.id)
+  const res = await conversationListFetch(curActiveChat.id ?? chatList.value[0].id)
   conversationList.value = res.data.list
   setTimeout(() => {
     scrollbarRef.value?.scrollTop(Number.MAX_SAFE_INTEGER)
@@ -163,7 +184,7 @@ watch(chatList, async () => {
       <div class="mobile-sidebar-mask" v-if="!collapsed" @click="collapsed = !collapsed"></div>
       <a-layout-sider
         class="layout-sider"
-        style="padding: 0 5px 0 20px; position: relative; z-index: 20"
+        style="padding: 0 5px 0 20px; position: relative; z-index: 102"
         :width="312"
         hide-trigger
         collapsible
@@ -183,7 +204,13 @@ watch(chatList, async () => {
           <IconCaretLeft v-else />
         </a-button>
         <div style="display: flex; margin: 15px 14px 15px 0">
-          <a-input-search placeholder="搜索对话记录" />
+          <a-input-search
+            allow-clear
+            placeholder="搜索聊天"
+            @input="searchChatHandle"
+            @clear="searchChatHandle"
+            v-model="searchInputVal"
+          />
           <a-button type="primary" style="margin-left: 8px" @click="createChatHandle">
             <!-- <template #icon>
               <icon-plus-circle />
@@ -194,11 +221,11 @@ watch(chatList, async () => {
         <a-scrollbar style="height: calc(99vh - 62px); overflow: auto">
           <ul class="chat-container">
             <li
-              @click="toggleChatHandle({ index, chatId: item.id })"
               v-for="(item, index) in chatList"
+              @click="toggleChatHandle({ index, chatId: item.id })"
               :class="{
                 'chat-item': true,
-                'active-chat': index === curActiveChat
+                'active-chat': index === curActiveChat.index
               }"
               :key="item.id"
             >
@@ -210,7 +237,7 @@ watch(chatList, async () => {
               </div>
               <div>
                 <span class="edit-chat-btn" @click.stop="editChatHandle(item)"><icon-edit /></span>
-                <span class="delete-chat-btn" @click.stop="deleteChatHandle(item)">
+                <span class="delete-chat-btn" @click.stop="deleteChatHandle(item, index)">
                   <icon-delete />
                 </span>
               </div>
@@ -251,7 +278,11 @@ watch(chatList, async () => {
                 </div>
                 <div class="ai-content">
                   <a-avatar
-                    :style="{ backgroundColor: '#14a9f8', minWidth: '40px', minHeight: '40px' }"
+                    :style="{
+                      backgroundColor: 'rgb(var(--primary-5))',
+                      minWidth: '40px',
+                      minHeight: '40px'
+                    }"
                   >
                     AI
                   </a-avatar>

@@ -15,8 +15,8 @@ const useChatStore = defineStore('chat', {
     chatList: []
   }),
   actions: {
-    async getChatList() {
-      const res = await getChatListFetch()
+    async getChatList(query?: { keywords: string }) {
+      const res = await getChatListFetch(query)
       this.chatList = res.data.list
       return res.data
     },
