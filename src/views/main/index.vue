@@ -55,8 +55,9 @@ const setCurActiveChat = ({ index, id }: { index: number; id: number }) => {
 
 // 新建聊天
 const createChatHandle = async () => {
-  await chatStore.createChat()
-  setCurActiveChat({ index: 0, id: chatList.value[0].id })
+  const { id } = await chatStore.createChat()
+  setCurActiveChat({ index: 0, id })
+  chatStore.getChatList()
 }
 
 // 删除聊天
@@ -70,9 +71,8 @@ const deleteChatHandle = ({ id, name }: { id: number; name: string }, index: num
     okButtonProps: { size: 'small' },
     onCancel: () => {},
     onOk: async () => {
-      console.log(index, curActiveChat.index)
       if (index === curActiveChat.index) {
-        setCurActiveChat({ index: 0, id: chatList.value[0].id })
+        setCurActiveChat({ index: 0, id: chatList.value[1].id })
       } else if (index < curActiveChat.index) {
         curActiveChat.index -= 1
       }
@@ -92,7 +92,6 @@ const editChatHandle = ({ id, name }: { id: number; name: string }) => {
 // 编辑确认
 const handleOk = () => {
   editorFormRef.value.validate().then(async (error: any) => {
-    visible.value = true
     if (!error) {
       await chatStore.editChat(curEditChatId, form)
       visible.value = false
@@ -144,6 +143,7 @@ const sendHandle = async (event: Event) => {
 }
 
 const toggleChatHandle = async ({ index, chatId }: { index: number; chatId: number }) => {
+  if (curActiveChat.index === index) return
   // 关闭请求
   xhr && xhr.abort()
   setCurActiveChat({ index, id: chatId })
@@ -177,7 +177,8 @@ onMounted(() => {
 })
 
 watch(chatList, async () => {
-  const res = await conversationListFetch(curActiveChat.id ?? chatList.value[0].id)
+  curActiveChat.id = curActiveChat.id ?? chatList.value[0].id
+  const res = await conversationListFetch(curActiveChat.id)
   conversationList.value = res.data.list
   setTimeout(() => {
     scrollbarRef.value?.scrollTop(Number.MAX_SAFE_INTEGER)
@@ -328,9 +329,24 @@ watch(chatList, async () => {
       </a-layout>
     </a-layout>
     <!-- 对话框 -->
-    <a-modal width="auto" v-model:visible="visible" title="编辑聊天" @ok="handleOk">
-      <a-form :model="form" ref="editorFormRef">
-        <a-form-item field="name" label="聊天名字" :required="true" message="聊天名字必填">
+    <a-modal
+      :width="340"
+      :visible="visible"
+      title="编辑聊天"
+      @ok="handleOk"
+      @cancel="visible = false"
+      :render-to-body="true"
+    >
+      <a-form :model="form" ref="editorFormRef" layout="vertical">
+        <a-form-item
+          field="name"
+          label="聊天名字"
+          :required="true"
+          :rules="{
+            required: true,
+            message: '聊天名字必填'
+          }"
+        >
           <a-input v-model="form.name" />
         </a-form-item>
       </a-form>
@@ -339,78 +355,5 @@ watch(chatList, async () => {
 </template>
 
 <style lang="less" scoped>
-.layout-container {
-  height: 100vh;
-}
-.layout-header {
-  display: flex;
-  flex-direction: row-reverse;
-}
-.layout-header,
-.layout-content,
-.layout-footer {
-  padding: 0 25px;
-}
-.send-container {
-  text-align: right;
-}
-.chat-container {
-  .chat-item {
-    border-radius: 8px;
-    background-color: var(--color-fill-1);
-    margin: 0 14px 10px 0;
-    border: 1px solid var(--color-border-1);
-    font-size: 14px;
-    padding: 12px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    cursor: pointer;
-    .edit-chat-btn {
-      margin-right: 10px;
-      &:hover {
-        color: rgb(var(--primary-7));
-      }
-    }
-    .delete-chat-btn:hover {
-      color: rgb(var(--danger-6));
-    }
-  }
-  .active-chat {
-    color: rgb(var(--arcoblue-6));
-    border-color: rgb(var(--arcoblue-6));
-    background-color: rgb(var(--arcoblue-1));
-  }
-}
-.content-item {
-  padding: 7px;
-  padding-right: 0;
-  .user-content,
-  .ai-content {
-    display: flex;
-    padding: 5px 0;
-  }
-  .user-text {
-    white-space: pre-wrap;
-    overflow-wrap: break-word;
-    word-break: break-word;
-    padding: 10px;
-    border-radius: 2px;
-    margin-left: 7px;
-    line-height: 25px;
-    width: fit-content;
-    max-width: 100%;
-  }
-  .ai-text {
-    white-space: pre-wrap;
-    overflow-wrap: break-word;
-    word-break: break-word;
-    padding: 10px;
-    border-radius: 2px;
-    margin-left: 7px;
-    line-height: 25px;
-    width: 100%;
-    background-color: var(--color-neutral-2);
-  }
-}
+@import url(./index.less);
 </style>

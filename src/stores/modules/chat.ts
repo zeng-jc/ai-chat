@@ -21,8 +21,8 @@ const useChatStore = defineStore('chat', {
       return res.data
     },
     async createChat() {
-      await createChatFetch()
-      await this.getChatList()
+      const { data } = await createChatFetch()
+      return data
     },
     async deleteChat(id: number) {
       await deleteChatFetch(id)
