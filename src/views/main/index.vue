@@ -33,8 +33,9 @@ const scrollbarRef = ref<ScrollbarInstance>()
 const sendStatus = ref<boolean>(true)
 const { chatList } = storeToRefs(chatStore)
 // 当前选中的聊天
-const curActiveChat = reactive<{ id?: number; index: number }>({
-  index: 0
+const curActiveChat = reactive<{ id?: number; index: number; name: string }>({
+  index: 0,
+  name: ''
 })
 // 退出登录
 const logout = () => {
@@ -48,15 +49,16 @@ const logout = () => {
 }
 
 // 设置curActiveChat
-const setCurActiveChat = ({ index, id }: { index: number; id: number }) => {
+const setCurActiveChat = ({ index, id, name }: { index: number; id: number; name: string }) => {
   curActiveChat.index = index
   curActiveChat.id = id
+  curActiveChat.name = name
 }
 
 // 新建聊天
 const createChatHandle = async () => {
-  const { id } = await chatStore.createChat()
-  setCurActiveChat({ index: 0, id })
+  const { id, name } = await chatStore.createChat()
+  setCurActiveChat({ index: 0, id, name })
   chatStore.getChatList()
 }
 
@@ -72,7 +74,7 @@ const deleteChatHandle = ({ id, name }: { id: number; name: string }, index: num
     onCancel: () => {},
     onOk: async () => {
       if (index === curActiveChat.index) {
-        setCurActiveChat({ index: 0, id: chatList.value[1].id })
+        setCurActiveChat({ index: 0, id: chatList.value[1].id, name: chatList.value[1].name })
       } else if (index < curActiveChat.index) {
         curActiveChat.index -= 1
       }
@@ -130,7 +132,7 @@ const sendHandle = async (event: Event) => {
   const messageId = Date.now() + Math.floor(Math.random() * 100000) + ''
   //data是要发送给后台的数据
   let data = JSON.stringify({
-    chatId: 1,
+    chatId: curActiveChat.id,
     userMessage: userMessageInputVal.value,
     messageId
   })
@@ -142,11 +144,19 @@ const sendHandle = async (event: Event) => {
   event.preventDefault()
 }
 
-const toggleChatHandle = async ({ index, chatId }: { index: number; chatId: number }) => {
+const toggleChatHandle = async ({
+  index,
+  chatId,
+  name
+}: {
+  index: number
+  chatId: number
+  name: string
+}) => {
   if (curActiveChat.index === index) return
   // 关闭请求
   xhr && xhr.abort()
-  setCurActiveChat({ index, id: chatId })
+  setCurActiveChat({ index, id: chatId, name })
   const res = await conversationListFetch(chatId)
   conversationList.value = res.data.list
   setTimeout(() => {
@@ -178,6 +188,7 @@ onMounted(() => {
 
 watch(chatList, async () => {
   curActiveChat.id = curActiveChat.id ?? chatList.value[0].id
+  curActiveChat.name = chatList.value[0]?.name
   const res = await conversationListFetch(curActiveChat.id)
   conversationList.value = res.data.list
   setTimeout(() => {
@@ -230,7 +241,7 @@ watch(chatList, async () => {
           <ul class="chat-container">
             <li
               v-for="(item, index) in chatList"
-              @click.stop="toggleChatHandle({ index, chatId: item.id })"
+              @click.stop="toggleChatHandle({ index, chatId: item.id, name: item.name })"
               :class="{
                 'chat-item': true,
                 'active-chat': index === curActiveChat.index
@@ -255,6 +266,7 @@ watch(chatList, async () => {
       </a-layout-sider>
       <a-layout>
         <a-layout-header class="layout-header">
+          <div class="chat-name">{{ curActiveChat.name }}</div>
           <a-popconfirm content="你确定要退出登录吗?" type="warning" @ok="logout" position="left">
             <a-button type="outline">退出登录</a-button>
           </a-popconfirm>
