@@ -104,7 +104,7 @@ const handleOk = () => {
 const sendHandle = async (event: Event) => {
   if (!sendStatus.value) return
   xhr = new XMLHttpRequest()
-  xhr.open('POST', 'http://127.0.0.1:5173/api/conversation/send')
+  xhr.open('POST', import.meta.env.VITE_BASE_URL + '/conversation/send')
   xhr.setRequestHeader('Content-Type', 'application/json')
   xhr.setRequestHeader('Authorization', 'Bearer ' + userStore.token)
   let lastResponseLength = 0
@@ -230,7 +230,7 @@ watch(chatList, async () => {
           <ul class="chat-container">
             <li
               v-for="(item, index) in chatList"
-              @click="toggleChatHandle({ index, chatId: item.id })"
+              @click.stop="toggleChatHandle({ index, chatId: item.id })"
               :class="{
                 'chat-item': true,
                 'active-chat': index === curActiveChat.index
