@@ -115,10 +115,13 @@ const sendHandle = async (event: Event) => {
     // 更新已读取的响应长度，以便下次从新的位置开始读取
     lastResponseLength = xhr.responseText.length
     // 处理最新接收到的数据片段
-    const curData = newResponse.split(' ')[2]
-    const res = curData && JSON.parse(curData)
+    const regex = /"content":"(.*?)"/g
+    let match
+    while ((match = regex.exec(newResponse)) !== null) {
+      // match[1]包含了被括号捕获的匹配内容
+      conversationList.value[conversationList.value.length - 1].aiMessage += match[1]
+    }
     scrollbarRef.value?.scrollTop(Number.MAX_SAFE_INTEGER)
-    if (res) conversationList.value[conversationList.value.length - 1].aiMessage += res?.data
   }
   xhr.onloadend = function () {
     curActiveChat.id &&
