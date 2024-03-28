@@ -10,13 +10,27 @@ import { h } from 'vue'
 import _debounce from '@/utils/debounce'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 import isInvalidJSON from '@/utils/isInvalidJSON'
+import MarkdownIt from 'markdown-it'
+import markdownItHighlightjs from 'markdown-it-highlightjs'
+import markdownItCodeCopy from 'markdown-it-code-copy'
+
+// 初始化 markdown-it 实例
+const md = new MarkdownIt()
+// 配置代码高亮插件
+md.use(markdownItHighlightjs)
+// 配置代码块复制插件
+md.use(markdownItCodeCopy, {
+  buttonClass: '',
+  iconStyle: 'font-size: 21px; opacity: 0.4; width:20px; height:20px; ',
+  iconClass: 'icon iconfont'
+})
 
 const userStore = useUserStore()
 const chatStore = useChatStore()
 chatStore.getChatList()
 
 let curEditChatId: number
-let xhr: XMLHttpRequest
+const ctrl = new AbortController()
 const router = useRouter()
 const aTextareaRef = ref()
 const userMessageInputVal = ref<string>('') // 输入框内容
@@ -39,6 +53,7 @@ const curActiveChat = reactive<{ id?: number; index: number; name: string }>({
   index: 0,
   name: ''
 })
+
 // 退出登录
 const logout = () => {
   // 1.执行退出登录接口
@@ -117,7 +132,8 @@ const sendHandle = async (event: Event) => {
     body: JSON.stringify({
       chatId: curActiveChat.id,
       userMessage: userMessageInputVal.value,
-      messageId
+      messageId,
+      signal: ctrl.signal
     }),
     onmessage({ data }) {
       const json = isInvalidJSON(data)
@@ -134,8 +150,10 @@ const sendHandle = async (event: Event) => {
         })
       sendStatus.value = true
     },
-    onerror() {
-      console.log('error')
+    onerror(err) {
+      ctrl.abort()
+      Message.error('AI对话异常')
+      throw err
     }
   })
 
@@ -156,7 +174,7 @@ const toggleChatHandle = async ({
 }) => {
   if (curActiveChat.index === index) return
   // 关闭请求
-  xhr && xhr.abort()
+  ctrl && ctrl.abort()
   setCurActiveChat({ index, id: chatId, name })
   const res = await conversationListFetch(chatId)
   conversationList.value = res.data.list
@@ -190,16 +208,12 @@ onMounted(() => {
 watch(chatList, async () => {
   curActiveChat.id = curActiveChat.id ?? chatList.value[0].id
   curActiveChat.name = chatList.value[0]?.name
+  // 获取当前聊天的对话内容
   const res = await conversationListFetch(curActiveChat.id)
   conversationList.value = res.data.list
-  conversationList.value.forEach((item) => {
-    item.aiMessage = item.aiMessage.replace(/\\n/g, '<br>')
-  })
   setTimeout(() => {
     scrollbarRef.value?.scrollTop(Number.MAX_SAFE_INTEGER)
   }, 10)
-  // 代码高亮
-  // hljs.highlightElement()
 })
 </script>
 
@@ -315,7 +329,7 @@ watch(chatList, async () => {
                   >
                     AI
                   </a-avatar>
-                  <p class="ai-text">{{ item.aiMessage }}</p>
+                  <p class="ai-text" v-html="md.render(item.aiMessage)"></p>
                 </div>
               </li>
             </ul>
@@ -377,4 +391,10 @@ watch(chatList, async () => {
 
 <style lang="less" scoped>
 @import url(./index.less);
+.my-button-class {
+  background-color: #f5f5f5 !important;
+  color: #333 !important;
+  border-radius: 4px !important;
+  padding: 5px 10px !important;
+}
 </style>
