@@ -9,6 +9,7 @@ import { storeToRefs } from 'pinia'
 import { h } from 'vue'
 import _debounce from '@/utils/debounce'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
+import isInvalidJSON from '@/utils/isInvalidJSON'
 
 const userStore = useUserStore()
 const chatStore = useChatStore()
@@ -119,18 +120,22 @@ const sendHandle = async (event: Event) => {
       messageId
     }),
     onmessage({ data }) {
-      if (!data || data === '[DONE]') return
-      conversationList.value[conversationList.value.length - 1].aiMessage +=
-        JSON.parse(data).content
+      const json = isInvalidJSON(data)
+      if (!json) return
+      conversationList.value[conversationList.value.length - 1].aiMessage += json.content
       scrollbarRef.value?.scrollTop(Number.MAX_SAFE_INTEGER)
     },
     onclose() {
+      console.log('onclose')
       curActiveChat.id &&
         saveConversationFetch({
           messageId: messageId,
           chatId: curActiveChat.id
         })
       sendStatus.value = true
+    },
+    onerror() {
+      console.log('error')
     }
   })
 
@@ -310,7 +315,7 @@ watch(chatList, async () => {
                   >
                     AI
                   </a-avatar>
-                  <p class="ai-text" v-html="item.aiMessage"></p>
+                  <p class="ai-text">{{ item.aiMessage }}</p>
                 </div>
               </li>
             </ul>
