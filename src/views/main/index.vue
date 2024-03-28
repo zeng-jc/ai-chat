@@ -8,6 +8,7 @@ import { ref, onMounted, reactive, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { h } from 'vue'
 import _debounce from '@/utils/debounce'
+import { fetchEventSource } from '@microsoft/fetch-event-source'
 
 const userStore = useUserStore()
 const chatStore = useChatStore()
@@ -105,42 +106,34 @@ const handleOk = () => {
 // 发送信息
 const sendHandle = async (event: Event) => {
   if (!sendStatus.value) return
-  xhr = new XMLHttpRequest()
-  xhr.open('POST', import.meta.env.VITE_BASE_URL + '/conversation/send')
-  xhr.setRequestHeader('Content-Type', 'application/json')
-  xhr.setRequestHeader('Authorization', 'Bearer ' + userStore.token)
-  let lastResponseLength = 0
-  xhr.onprogress = function () {
-    const newResponse = xhr.responseText.substring(lastResponseLength)
-    // 更新已读取的响应长度，以便下次从新的位置开始读取
-    lastResponseLength = xhr.responseText.length
-    // 处理最新接收到的数据片段
-    const regex = /"content":"(.*?)"/g
-    let match
-    while ((match = regex.exec(newResponse)) !== null) {
-      // match[1]包含了被括号捕获的匹配内容
-      conversationList.value[conversationList.value.length - 1].aiMessage += match[1]
-    }
-    scrollbarRef.value?.scrollTop(Number.MAX_SAFE_INTEGER)
-  }
-  xhr.onloadend = function () {
-    curActiveChat.id &&
-      saveConversationFetch({
-        messageId: messageId,
-        chatId: curActiveChat.id
-      })
-    sendStatus.value = true
-  }
-
   const messageId = Date.now() + Math.floor(Math.random() * 100000) + ''
-  //data是要发送给后台的数据
-  let data = JSON.stringify({
-    chatId: curActiveChat.id,
-    userMessage: userMessageInputVal.value,
-    messageId
+  fetchEventSource(import.meta.env.VITE_BASE_URL + '/conversation/send', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + userStore.token
+    },
+    body: JSON.stringify({
+      chatId: curActiveChat.id,
+      userMessage: userMessageInputVal.value,
+      messageId
+    }),
+    onmessage({ data }) {
+      if (!data || data === '[DONE]') return
+      conversationList.value[conversationList.value.length - 1].aiMessage +=
+        JSON.parse(data).content
+      scrollbarRef.value?.scrollTop(Number.MAX_SAFE_INTEGER)
+    },
+    onclose() {
+      curActiveChat.id &&
+        saveConversationFetch({
+          messageId: messageId,
+          chatId: curActiveChat.id
+        })
+      sendStatus.value = true
+    }
   })
-  xhr.send(data)
-  // 禁用按钮
+
   sendStatus.value = false
   conversationList.value.push({ userMessage: userMessageInputVal.value, aiMessage: '' })
   userMessageInputVal.value = ''
@@ -194,9 +187,14 @@ watch(chatList, async () => {
   curActiveChat.name = chatList.value[0]?.name
   const res = await conversationListFetch(curActiveChat.id)
   conversationList.value = res.data.list
+  conversationList.value.forEach((item) => {
+    item.aiMessage = item.aiMessage.replace(/\\n/g, '<br>')
+  })
   setTimeout(() => {
     scrollbarRef.value?.scrollTop(Number.MAX_SAFE_INTEGER)
   }, 10)
+  // 代码高亮
+  // hljs.highlightElement()
 })
 </script>
 
@@ -299,6 +297,9 @@ watch(chatList, async () => {
                   </a-avatar>
                   <p class="user-text">{{ item.userMessage }}</p>
                 </div>
+                <div class="conversation-time">
+                  {{ item.createTime }}
+                </div>
                 <div class="ai-content">
                   <a-avatar
                     :style="{
@@ -309,7 +310,7 @@ watch(chatList, async () => {
                   >
                     AI
                   </a-avatar>
-                  <p class="ai-text">{{ item.aiMessage }}</p>
+                  <p class="ai-text" v-html="item.aiMessage"></p>
                 </div>
               </li>
             </ul>

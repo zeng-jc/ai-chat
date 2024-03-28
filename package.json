@@ -14,7 +14,9 @@
   },
   "dependencies": {
     "@arco-design/web-vue": "^2.54.6",
+    "@microsoft/fetch-event-source": "^2.0.1",
     "axios": "^1.6.5",
+    "highlight.js": "^11.9.0",
     "pinia": "^2.1.7",
     "pinia-plugin-persistedstate": "^3.2.1",
     "vue": "^3.3.11",
