@@ -37,6 +37,22 @@ export default defineConfig({
       ext: '.gz'
     })
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        entryFileNames: 'js/[name]-main-[hash].js',
+        chunkFileNames: 'js/[name]-[hash].js',
+        assetFileNames(assetInfo) {
+          if (assetInfo.name?.endsWith('.css')) return (assetInfo.name = 'css/[name]-[hash].css')
+          const images = ['png', 'jpg', 'jpeg', 'gif', 'svg']
+          if (images.includes(assetInfo.name?.split('.')[1] ?? '')) {
+            return 'img/[name]-[hash].[ext]'
+          }
+          return '[ext]/[name]-[hash].[ext]'
+        }
+      }
+    }
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))
