@@ -7,6 +7,7 @@ import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { ArcoResolver } from 'unplugin-vue-components/resolvers'
 import { vitePluginForArco } from '@arco-plugins/vite-vue'
+import compression from 'vite-plugin-compression'
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -25,6 +26,15 @@ export default defineConfig({
     }),
     vitePluginForArco({
       style: 'css'
+    }),
+    compression({
+      verbose: true,
+      disable: false,
+      threshold: 10240,
+      // 删除源文件
+      deleteOriginFile: true,
+      algorithm: 'gzip',
+      ext: '.gz'
     })
   ],
   resolve: {
